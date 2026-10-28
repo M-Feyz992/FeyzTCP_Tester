@@ -1,0 +1,3 @@
+FeyzTCP_Tester.MainActivity, FeyzTCP_Tester;crc644717373c647c7a0b.MainActivity
+FeyzTCP_Tester.MainActivity;crc644717373c647c7a0b.MainActivity
+feyztcp_tester.MainActivity;crc644717373c647c7a0b.MainActivity

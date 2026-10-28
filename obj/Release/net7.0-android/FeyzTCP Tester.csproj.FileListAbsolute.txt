@@ -1,0 +1,12 @@
+E:\C_Sharp\CCSPlus_WLAN_Tester\CCSPlus_WLAN_Tester\obj\Release\net7.0-android\.NETCoreApp,Version=v7.0.AssemblyAttributes.cs
+E:\C_Sharp\CCSPlus_WLAN_Tester\CCSPlus_WLAN_Tester\obj\Release\net7.0-android\build.props
+E:\C_Sharp\CCSPlus_WLAN_Tester\CCSPlus_WLAN_Tester\obj\Release\net7.0-android\adb.props
+E:\C_Sharp\CCSPlus_WLAN_Tester\CCSPlus_WLAN_Tester\obj\Release\net7.0-android\FeyzTCP Tester.csproj.AssemblyReference.cache
+E:\C_Sharp\CCSPlus_WLAN_Tester\CCSPlus_WLAN_Tester\obj\Release\net7.0-android\stamp\_BuildLibraryImportsCache.stamp
+E:\C_Sharp\CCSPlus_WLAN_Tester\CCSPlus_WLAN_Tester\obj\Release\net7.0-android\res.flag
+E:\C_Sharp\CCSPlus_WLAN_Tester\CCSPlus_WLAN_Tester\obj\Release\net7.0-android\R.txt
+E:\C_Sharp\CCSPlus_WLAN_Tester\CCSPlus_WLAN_Tester\obj\Release\net7.0-android\R.cs.flag
+E:\C_Sharp\CCSPlus_WLAN_Tester\CCSPlus_WLAN_Tester\obj\Release\net7.0-android\FeyzTCP Tester.GeneratedMSBuildEditorConfig.editorconfig
+E:\C_Sharp\CCSPlus_WLAN_Tester\CCSPlus_WLAN_Tester\obj\Release\net7.0-android\FeyzTCP Tester.AssemblyInfoInputs.cache
+E:\C_Sharp\CCSPlus_WLAN_Tester\CCSPlus_WLAN_Tester\obj\Release\net7.0-android\FeyzTCP Tester.AssemblyInfo.cs
+E:\C_Sharp\CCSPlus_WLAN_Tester\CCSPlus_WLAN_Tester\obj\Release\net7.0-android\FeyzTCP Tester.csproj.CoreCompileInputs.cache

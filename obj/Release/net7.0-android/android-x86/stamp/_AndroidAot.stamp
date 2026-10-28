@@ -1,0 +1,15 @@
+obj\Release\net7.0-android\android-x86\aot\FeyzTCP_Tester.dll.so
+obj\Release\net7.0-android\android-x86\aot\System.Collections.Concurrent.dll.so
+obj\Release\net7.0-android\android-x86\aot\System.Console.dll.so
+obj\Release\net7.0-android\android-x86\aot\System.Linq.dll.so
+obj\Release\net7.0-android\android-x86\aot\System.Net.NameResolution.dll.so
+obj\Release\net7.0-android\android-x86\aot\System.Net.Primitives.dll.so
+obj\Release\net7.0-android\android-x86\aot\System.Net.Sockets.dll.so
+obj\Release\net7.0-android\android-x86\aot\System.Private.Uri.dll.so
+obj\Release\net7.0-android\android-x86\aot\System.Runtime.InteropServices.dll.so
+obj\Release\net7.0-android\android-x86\aot\System.Runtime.dll.so
+obj\Release\net7.0-android\android-x86\aot\System.Text.RegularExpressions.dll.so
+obj\Release\net7.0-android\android-x86\aot\System.Threading.dll.so
+obj\Release\net7.0-android\android-x86\aot\Java.Interop.dll.so
+obj\Release\net7.0-android\android-x86\aot\Mono.Android.dll.so
+obj\Release\net7.0-android\android-x86\aot\System.Private.CoreLib.dll.so
