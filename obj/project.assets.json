@@ -18,9 +18,9 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "E:\\C_Sharp\\FeyzTCP_Tester\\FeyzTCP_Tester\\FeyzTCP_Tester.csproj",
-      "projectName": "FeyzTCP_Tester",
-      "projectPath": "E:\\C_Sharp\\FeyzTCP_Tester\\FeyzTCP_Tester\\FeyzTCP_Tester.csproj",
+      "projectUniqueName": "E:\\C_Sharp\\FeyzTCP_Tester\\FeyzTCP_Tester\\NetByte.csproj",
+      "projectName": "NetByte",
+      "projectPath": "E:\\C_Sharp\\FeyzTCP_Tester\\FeyzTCP_Tester\\NetByte.csproj",
       "packagesPath": "C:\\Users\\mf121223\\.nuget\\packages\\",
       "outputPath": "E:\\C_Sharp\\FeyzTCP_Tester\\FeyzTCP_Tester\\obj\\",
       "projectStyle": "PackageReference",

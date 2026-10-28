@@ -1,2 +1,0 @@
-E:\C_Sharp\CCSPlus_WLAN_Tester\CCSPlus_WLAN_Tester\bin\Release\net7.0-android\publish\com.companyname.ccsplus_wlan_tester-Signed.apk
-E:\C_Sharp\CCSPlus_WLAN_Tester\CCSPlus_WLAN_Tester\bin\Release\net7.0-android\publish\com.companyname.ccsplus_wlan_tester.apk

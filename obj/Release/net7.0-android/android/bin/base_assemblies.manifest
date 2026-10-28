@@ -1,0 +1,16 @@
+Hash 32     Hash 64             Blob ID  Blob idx  Name
+0x4f179757  0x8063eb133ba0686c  000      0000      NetByte
+0x7ec9ffe9  0xd77dbb1e38cd3d6f  000      0001      System.Console
+0x4eed2679  0x64e71ccf51a90a5a  000      0002      System.Linq
+0xde7354ab  0x2487b36034f808cb  000      0003      System.Net.NameResolution
+0xf462c30d  0x76d841191140ca5b  000      0004      System.Private.Uri
+0x06ffddbc  0x9f6614bf0f8b71b6  000      0005      System.Runtime.InteropServices
+0x61c036ca  0x860e407c9991dd9b  000      0006      System.Text.RegularExpressions
+0xbff2e236  0xfa28e87b91334681  000      0007      System.Threading
+0xc8a662e9  0x77b654e585b55834  000      0008      Java.Interop
+0xcf3163e6  0x01accec39cafe242  000      0009      Mono.Android
+0x2814a96c  0x1fc00515e8ce7513  001      0000      System.Collections.Concurrent
+0x8c40e0db  0x95ac8cfb68830758  001      0001      System.Net.Primitives
+0x88d8bfaa  0xd7e790fe7a6dc536  001      0002      System.Net.Sockets
+0xad6f1e8a  0x6b0ff375198b9c17  001      0003      System.Private.CoreLib
+0x62c6282e  0x22a7eb7046413568  001      0004      System.Runtime

@@ -8,9 +8,9 @@
 // </auto-generated>
 //------------------------------------------------------------------------------
 
-[assembly: global::Android.Runtime.ResourceDesignerAttribute("FeyzTCP_Tester.Resource", IsApplication=true)]
+[assembly: global::Android.Runtime.ResourceDesignerAttribute("NetByte.Resource", IsApplication=true)]
 
-namespace FeyzTCP_Tester
+namespace NetByte
 {
 	
 	
@@ -56,52 +56,145 @@ namespace FeyzTCP_Tester
 		{
 			
 			// aapt resource value: 0x7F020000
-			public const int btnClearLog = 2130837504;
+			public const int btnBench256K = 2130837504;
 			
 			// aapt resource value: 0x7F020001
-			public const int btnConnect = 2130837505;
+			public const int btnBench64K = 2130837505;
 			
 			// aapt resource value: 0x7F020002
-			public const int btnCopyLog = 2130837506;
+			public const int btnClearLog = 2130837506;
 			
 			// aapt resource value: 0x7F020003
-			public const int btnKey1 = 2130837507;
+			public const int btnCopyLog = 2130837507;
 			
 			// aapt resource value: 0x7F020004
-			public const int btnKey2 = 2130837508;
+			public const int btnDirectSend = 2130837508;
 			
 			// aapt resource value: 0x7F020005
-			public const int btnKey3 = 2130837509;
+			public const int btnMainConnect = 2130837509;
 			
 			// aapt resource value: 0x7F020006
-			public const int btnKey4 = 2130837510;
+			public const int btnOpenGithub = 2130837510;
 			
 			// aapt resource value: 0x7F020007
-			public const int btnSendCustom = 2130837511;
+			public const int btnSelectAndSendFile = 2130837511;
 			
 			// aapt resource value: 0x7F020008
 			public const int btnShareLog = 2130837512;
 			
 			// aapt resource value: 0x7F020009
-			public const int btnSpeedTestESP = 2130837513;
+			public const int etDirectInput = 2130837513;
 			
 			// aapt resource value: 0x7F02000A
-			public const int btnSpeedTestSTM = 2130837514;
+			public const int etTargetIp = 2130837514;
 			
 			// aapt resource value: 0x7F02000B
-			public const int etCustomHex = 2130837515;
+			public const int etTargetPort = 2130837515;
 			
 			// aapt resource value: 0x7F02000C
-			public const int etIp = 2130837516;
+			public const int macroKey0 = 2130837516;
 			
 			// aapt resource value: 0x7F02000D
-			public const int etPort = 2130837517;
+			public const int macroKey1 = 2130837517;
 			
 			// aapt resource value: 0x7F02000E
-			public const int scrollLog = 2130837518;
+			public const int macroKey10 = 2130837518;
 			
 			// aapt resource value: 0x7F02000F
-			public const int tvLog = 2130837519;
+			public const int macroKey11 = 2130837519;
+			
+			// aapt resource value: 0x7F020010
+			public const int macroKey2 = 2130837520;
+			
+			// aapt resource value: 0x7F020011
+			public const int macroKey3 = 2130837521;
+			
+			// aapt resource value: 0x7F020012
+			public const int macroKey4 = 2130837522;
+			
+			// aapt resource value: 0x7F020013
+			public const int macroKey5 = 2130837523;
+			
+			// aapt resource value: 0x7F020014
+			public const int macroKey6 = 2130837524;
+			
+			// aapt resource value: 0x7F020015
+			public const int macroKey7 = 2130837525;
+			
+			// aapt resource value: 0x7F020016
+			public const int macroKey8 = 2130837526;
+			
+			// aapt resource value: 0x7F020017
+			public const int macroKey9 = 2130837527;
+			
+			// aapt resource value: 0x7F020018
+			public const int sbPacingDelay = 2130837528;
+			
+			// aapt resource value: 0x7F020019
+			public const int scrollLog = 2130837529;
+			
+			// aapt resource value: 0x7F02001A
+			public const int spnLineEnding = 2130837530;
+			
+			// aapt resource value: 0x7F02001B
+			public const int spnProtocol = 2130837531;
+			
+			// aapt resource value: 0x7F02001C
+			public const int spnSendFormat = 2130837532;
+			
+			// aapt resource value: 0x7F02001D
+			public const int spnViewFormat = 2130837533;
+			
+			// aapt resource value: 0x7F02001E
+			public const int tabBtnAbout = 2130837534;
+			
+			// aapt resource value: 0x7F02001F
+			public const int tabBtnConfig = 2130837535;
+			
+			// aapt resource value: 0x7F020020
+			public const int tabBtnMacros = 2130837536;
+			
+			// aapt resource value: 0x7F020021
+			public const int tabBtnTerminal = 2130837537;
+			
+			// aapt resource value: 0x7F020022
+			public const int tabBtnTransfer = 2130837538;
+			
+			// aapt resource value: 0x7F020023
+			public const int tabViewAbout = 2130837539;
+			
+			// aapt resource value: 0x7F020024
+			public const int tabViewConfig = 2130837540;
+			
+			// aapt resource value: 0x7F020025
+			public const int tabViewMacros = 2130837541;
+			
+			// aapt resource value: 0x7F020026
+			public const int tabViewTerminal = 2130837542;
+			
+			// aapt resource value: 0x7F020027
+			public const int tabViewTransfer = 2130837543;
+			
+			// aapt resource value: 0x7F020028
+			public const int tvBenchStats = 2130837544;
+			
+			// aapt resource value: 0x7F020029
+			public const int tvFileTransferStatus = 2130837545;
+			
+			// aapt resource value: 0x7F02002A
+			public const int tvGithubLink = 2130837546;
+			
+			// aapt resource value: 0x7F02002B
+			public const int tvLog = 2130837547;
+			
+			// aapt resource value: 0x7F02002C
+			public const int tvPacingVal = 2130837548;
+			
+			// aapt resource value: 0x7F02002D
+			public const int tvTopStatus = 2130837549;
+			
+			// aapt resource value: 0x7F02002E
+			public const int vStatusDot = 2130837550;
 			
 			static Id()
 			{
@@ -143,6 +236,12 @@ namespace FeyzTCP_Tester
 			
 			// aapt resource value: 0x7F040003
 			public const int appicon_round = 2130968579;
+			
+			// aapt resource value: 0x7F040004
+			public const int ic_launcher = 2130968580;
+			
+			// aapt resource value: 0x7F040005
+			public const int ic_launcher_round = 2130968581;
 			
 			static Mipmap()
 			{

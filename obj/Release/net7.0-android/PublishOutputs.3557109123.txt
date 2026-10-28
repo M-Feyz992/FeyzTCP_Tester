@@ -1,0 +1,2 @@
+E:\C_Sharp\FeyzTCP_Tester\FeyzTCP_Tester\bin\Release\net7.0-android\publish\com.feyz.netbyte-Signed.apk
+E:\C_Sharp\FeyzTCP_Tester\FeyzTCP_Tester\bin\Release\net7.0-android\publish\com.feyz.netbyte.apk

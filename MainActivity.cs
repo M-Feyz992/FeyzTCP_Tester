@@ -1,516 +1,658 @@
 using Android.App;
 using Android.Content;
+using Android.Content.Res;
 using Android.Graphics;
 using Android.OS;
+using Android.Runtime;
+using Android.Views;
 using Android.Widget;
 using System;
 using System.Diagnostics;
+using System.IO;
 using System.Net.Sockets;
+using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Threading.Tasks;
 
 using AndroidActivity = Android.App.Activity;
-using WidgetOrientation = Android.Widget.Orientation;
 
-namespace FeyzTCP_Tester
+namespace NetByte
 {
-    [Activity(Label = "FeyzTCP Tester", MainLauncher = true)]
+    [Register("com.feyz.netbyte.MainActivity")]
+    [Activity(
+        Label = "Feyz Net Byte",
+        Icon = "@mipmap/ic_launcher",
+        RoundIcon = "@mipmap/ic_launcher",
+        MainLauncher = true,
+        Exported = true,
+        ConfigurationChanges = Android.Content.PM.ConfigChanges.Orientation | Android.Content.PM.ConfigChanges.ScreenSize
+    )]
     public class MainActivity : AndroidActivity
     {
-        private EditText? etIp;
-        private EditText? etPort;
-        private EditText? etCustomHex;
+        private const int REQUEST_PICK_FILE = 1001;
+        private const string GITHUB_URL = "https://github.com/feyz";
+
+        // Status Indicators
+        private View? vStatusDot;
+        private TextView? tvTopStatus;
+
+        // Navigation Tabs
+        private Button? tabBtnTerminal, tabBtnMacros, tabBtnTransfer, tabBtnConfig, tabBtnAbout;
+        private LinearLayout? tabViewTerminal;
+        private ScrollView? tabViewMacros, tabViewTransfer, tabViewConfig, tabViewAbout;
+
+        // Terminal Components
         private TextView? tvLog;
         private ScrollView? scrollLog;
+        private Spinner? spnViewFormat, spnSendFormat, spnLineEnding;
+        private Button? btnCopyLog, btnShareLog, btnClearLog, btnDirectSend;
+        private EditText? etDirectInput;
 
-        private Button? btnConnect;
-        private Button? btnSpeedTestESP;
-        private Button? btnSpeedTestSTM;
-        private Button? btnCopyLog;
-        private Button? btnShareLog;
-        private Button? btnClearLog;
-        private Button? btnSendCustom;
-        private Button? btnKey1;
-        private Button? btnKey2;
-        private Button? btnKey3;
-        private Button? btnKey4;
+        // Macro Keys
+        private readonly Button?[] macroButtons = new Button?[12];
+        private readonly string[] macroLabels = new string[12];
+        private readonly string[] macroPayloads = new string[12];
+        private readonly string[] macroFormats = new string[12];
 
+        // Benchmark & File Streaming
+        private Button? btnBench64K, btnBench256K, btnSelectAndSendFile;
+        private TextView? tvBenchStats, tvFileTransferStatus, tvPacingVal;
+        private SeekBar? sbPacingDelay;
+        private int pacingDelayMs = 0;
+        private double maxPeakBytesPerSec = 0.0;
+
+        // Config Components
+        private Spinner? spnProtocol;
+        private EditText? etTargetIp, etTargetPort;
+        private Button? btnMainConnect;
+
+        // About Components
+        private TextView? tvGithubLink;
+        private Button? btnOpenGithub;
+
+        // Persistent Socket Management
         private ISharedPreferences? prefs;
-
-        private string[] keyNames = new string[] { "KEY1", "KEY2", "KEY3", "KEY4" };
-        private string[] keyValues = new string[] { "01", "02", "03", "04" };
-
-        // Max Speed Trackers (in Bytes per second)
-        private double maxSpeedBytesPerSecESP = 0.0;
-        private double maxSpeedBytesPerSecSTM = 0.0;
-
         private TcpClient? tcpClient;
         private NetworkStream? netStream;
-        private readonly object streamLock = new object();
+        private CancellationTokenSource? rxCts;
+        private readonly object networkLock = new object();
         private bool isConnected = false;
-        private bool isTestingSpeed = false;
 
         protected override void OnCreate(Bundle? savedInstanceState)
         {
             base.OnCreate(savedInstanceState);
             SetContentView(Resource.Layout.activity_main);
 
-            prefs = GetSharedPreferences("FeyzTCP_Prefs", FileCreationMode.Private);
+            prefs = GetSharedPreferences("NetByte_Prefs", FileCreationMode.Private);
 
+            InitViews();
+            SetupSpinners();
+            LoadSavedSettings();
+            SetupEventHandlers();
+            SelectTab(0);
+            UpdateUiConnectionState();
+        }
+
+        private void InitViews()
+        {
             int GetId(string name) => Resources?.GetIdentifier(name, "id", PackageName) ?? 0;
 
-            etIp = FindViewById<EditText>(GetId("etIp"));
-            etPort = FindViewById<EditText>(GetId("etPort"));
-            etCustomHex = FindViewById<EditText>(GetId("etCustomHex"));
+            vStatusDot = FindViewById<View>(GetId("vStatusDot"));
+            tvTopStatus = FindViewById<TextView>(GetId("tvTopStatus"));
+
+            tabBtnTerminal = FindViewById<Button>(GetId("tabBtnTerminal"));
+            tabBtnMacros = FindViewById<Button>(GetId("tabBtnMacros"));
+            tabBtnTransfer = FindViewById<Button>(GetId("tabBtnTransfer"));
+            tabBtnConfig = FindViewById<Button>(GetId("tabBtnConfig"));
+            tabBtnAbout = FindViewById<Button>(GetId("tabBtnAbout"));
+
+            tabViewTerminal = FindViewById<LinearLayout>(GetId("tabViewTerminal"));
+            tabViewMacros = FindViewById<ScrollView>(GetId("tabViewMacros"));
+            tabViewTransfer = FindViewById<ScrollView>(GetId("tabViewTransfer"));
+            tabViewConfig = FindViewById<ScrollView>(GetId("tabViewConfig"));
+            tabViewAbout = FindViewById<ScrollView>(GetId("tabViewAbout"));
+
             tvLog = FindViewById<TextView>(GetId("tvLog"));
             scrollLog = FindViewById<ScrollView>(GetId("scrollLog"));
+            spnViewFormat = FindViewById<Spinner>(GetId("spnViewFormat"));
+            spnSendFormat = FindViewById<Spinner>(GetId("spnSendFormat"));
+            spnLineEnding = FindViewById<Spinner>(GetId("spnLineEnding"));
 
-            btnConnect = FindViewById<Button>(GetId("btnConnect"));
-            btnSpeedTestESP = FindViewById<Button>(GetId("btnSpeedTestESP"));
-            btnSpeedTestSTM = FindViewById<Button>(GetId("btnSpeedTestSTM"));
             btnCopyLog = FindViewById<Button>(GetId("btnCopyLog"));
             btnShareLog = FindViewById<Button>(GetId("btnShareLog"));
             btnClearLog = FindViewById<Button>(GetId("btnClearLog"));
-            btnSendCustom = FindViewById<Button>(GetId("btnSendCustom"));
-            btnKey1 = FindViewById<Button>(GetId("btnKey1"));
-            btnKey2 = FindViewById<Button>(GetId("btnKey2"));
-            btnKey3 = FindViewById<Button>(GetId("btnKey3"));
-            btnKey4 = FindViewById<Button>(GetId("btnKey4"));
+            btnDirectSend = FindViewById<Button>(GetId("btnDirectSend"));
+            etDirectInput = FindViewById<EditText>(GetId("etDirectInput"));
 
-            LoadPreferences();
-            SetupEvents();
-            UpdateConnectButtonVisuals();
+            for (int i = 0; i < 12; i++)
+            {
+                macroButtons[i] = FindViewById<Button>(GetId($"macroKey{i}"));
+            }
+
+            btnBench64K = FindViewById<Button>(GetId("btnBench64K"));
+            btnBench256K = FindViewById<Button>(GetId("btnBench256K"));
+            btnSelectAndSendFile = FindViewById<Button>(GetId("btnSelectAndSendFile"));
+            tvBenchStats = FindViewById<TextView>(GetId("tvBenchStats"));
+            tvFileTransferStatus = FindViewById<TextView>(GetId("tvFileTransferStatus"));
+            tvPacingVal = FindViewById<TextView>(GetId("tvPacingVal"));
+            sbPacingDelay = FindViewById<SeekBar>(GetId("sbPacingDelay"));
+
+            spnProtocol = FindViewById<Spinner>(GetId("spnProtocol"));
+            etTargetIp = FindViewById<EditText>(GetId("etTargetIp"));
+            etTargetPort = FindViewById<EditText>(GetId("etTargetPort"));
+            btnMainConnect = FindViewById<Button>(GetId("btnMainConnect"));
+
+            tvGithubLink = FindViewById<TextView>(GetId("tvGithubLink"));
+            btnOpenGithub = FindViewById<Button>(GetId("btnOpenGithub"));
         }
 
-        private void LoadPreferences()
+        private void SetupSpinners()
+        {
+            void SetAdapter(Spinner? spinner, string[] items)
+            {
+                if (spinner == null) return;
+                var adapter = new ThemedSpinnerAdapter(this, items);
+                spinner.Adapter = adapter;
+            }
+
+            SetAdapter(spnViewFormat, new[] { "Mixed (HEX + ASCII)", "HEX Only", "ASCII Only" });
+            SetAdapter(spnSendFormat, new[] { "HEX Bytes", "ASCII Text" });
+            SetAdapter(spnLineEnding, new[] { "None", "CR+LF (\\r\\n)", "LF (\\n)", "CR (\\r)" });
+            SetAdapter(spnProtocol, new[] { "TCP Client", "TCP Server", "UDP" });
+        }
+
+        private void LoadSavedSettings()
         {
             if (prefs != null)
             {
-                if (etIp != null) etIp.Text = prefs.GetString("SAVED_IP", "192.168.4.1") ?? "192.168.4.1";
-                if (etPort != null) etPort.Text = prefs.GetString("SAVED_PORT", "8080") ?? "8080";
+                if (etTargetIp != null) etTargetIp.Text = prefs.GetString("IP", "192.168.4.1") ?? "192.168.4.1";
+                if (etTargetPort != null) etTargetPort.Text = prefs.GetString("PORT", "8080") ?? "8080";
 
-                for (int i = 0; i < 4; i++)
+                maxPeakBytesPerSec = Convert.ToDouble(prefs.GetString("MAX_PEAK_SPEED", "0.0"));
+                if (tvBenchStats != null) tvBenchStats.Text = $"Peak Speed: {FormatSpeed(maxPeakBytesPerSec)}";
+
+                for (int i = 0; i < 12; i++)
                 {
-                    keyNames[i] = prefs.GetString($"NAME_{i}", keyNames[i]) ?? keyNames[i];
-                    keyValues[i] = prefs.GetString($"VAL_{i}", keyValues[i]) ?? keyValues[i];
+                    macroLabels[i] = prefs.GetString($"M_LBL_{i}", $"KEY {i + 1}") ?? $"KEY {i + 1}";
+                    macroPayloads[i] = prefs.GetString($"M_PAY_{i}", (i + 1).ToString("X2")) ?? (i + 1).ToString("X2");
+                    macroFormats[i] = prefs.GetString($"M_FMT_{i}", "HEX") ?? "HEX";
                 }
-
-                // Load saved max throughputs
-                maxSpeedBytesPerSecESP = Convert.ToDouble(prefs.GetString("MAX_SPEED_ESP", "0.0"));
-                maxSpeedBytesPerSecSTM = Convert.ToDouble(prefs.GetString("MAX_SPEED_STM", "0.0"));
             }
-            UpdateButtonLabels();
+            UpdateMacroButtonLabels();
         }
 
-        private void UpdateButtonLabels()
+        private void UpdateMacroButtonLabels()
         {
-            if (btnKey1 != null) btnKey1.Text = $"{keyNames[0]} (0x{keyValues[0]})";
-            if (btnKey2 != null) btnKey2.Text = $"{keyNames[1]} (0x{keyValues[1]})";
-            if (btnKey3 != null) btnKey3.Text = $"{keyNames[2]} (0x{keyValues[2]})";
-            if (btnKey4 != null) btnKey4.Text = $"{keyNames[3]} (0x{keyValues[3]})";
+            for (int i = 0; i < 12; i++)
+            {
+                if (macroButtons[i] != null)
+                {
+                    macroButtons[i]!.Text = $"{macroLabels[i]}\n[{macroPayloads[i]}]";
+                }
+            }
         }
 
-        private void SetupEvents()
+        private void SetupEventHandlers()
         {
-            if (btnConnect != null)
-            {
-                btnConnect.Click += async (s, e) =>
-                {
-                    if (!isConnected)
-                        await ConnectToServerAsync();
-                    else
-                        DisconnectFromServer();
-                };
-            }
+            tabBtnTerminal!.Click += (s, e) => SelectTab(0);
+            tabBtnMacros!.Click += (s, e) => SelectTab(1);
+            tabBtnTransfer!.Click += (s, e) => SelectTab(2);
+            tabBtnConfig!.Click += (s, e) => SelectTab(3);
+            tabBtnAbout!.Click += (s, e) => SelectTab(4);
 
-            // Bulk Speed Test: ESP Wi-Fi (256 KB)
-            if (btnSpeedTestESP != null)
+            btnMainConnect!.Click += async (s, e) =>
             {
-                btnSpeedTestESP.Click += async (s, e) =>
-                {
-                    if (!isConnected) { Toast.MakeText(this, "Connect first!", ToastLength.Short)?.Show(); return; }
-                    if (isTestingSpeed) return;
-                    await ExecuteSpeedBenchmarkAsync(0xFE, 262144, "ESP8266 (Wi-Fi Link)", isESP: true);
-                };
-            }
+                if (!isConnected)
+                    await StartConnectionAsync();
+                else
+                    CloseConnection();
+            };
 
-            // Bulk Speed Test: STM32 DMA Link (32 KB)
-            if (btnSpeedTestSTM != null)
+            btnDirectSend!.Click += async (s, e) =>
             {
-                btnSpeedTestSTM.Click += async (s, e) =>
-                {
-                    if (!isConnected) { Toast.MakeText(this, "Connect first!", ToastLength.Short)?.Show(); return; }
-                    if (isTestingSpeed) return;
-                    await ExecuteSpeedBenchmarkAsync(0xFD, 32768, "STM32F429 (DMA Link)", isESP: false);
-                };
-            }
+                string text = etDirectInput?.Text?.Trim() ?? "";
+                if (string.IsNullOrEmpty(text)) return;
 
-            // Copy Log to Clipboard
-            if (btnCopyLog != null)
-            {
-                btnCopyLog.Click += (s, e) =>
-                {
-                    var clipboard = (ClipboardManager?)GetSystemService(ClipboardService);
-                    if (clipboard != null && tvLog != null)
-                    {
-                        var clip = ClipData.NewPlainText("FeyzTCP Log", tvLog.Text);
-                        clipboard.PrimaryClip = clip;
-                        Toast.MakeText(this, "Log copied to clipboard!", ToastLength.Short)?.Show();
-                    }
-                };
-            }
+                bool isHex = (spnSendFormat?.SelectedItemPosition == 0);
+                string endingMode = spnLineEnding?.SelectedItem?.ToString() ?? "None";
 
-            // Share Log via System Dialog
-            if (btnShareLog != null)
-            {
-                btnShareLog.Click += (s, e) =>
+                byte[]? bytesToSend = ParsePayload(text, isHex, endingMode);
+                if (bytesToSend != null)
                 {
-                    if (tvLog == null || string.IsNullOrWhiteSpace(tvLog.Text)) return;
-                    Intent sendIntent = new Intent();
-                    sendIntent.SetAction(Intent.ActionSend);
-                    sendIntent.PutExtra(Intent.ExtraText, tvLog.Text);
-                    sendIntent.SetType("text/plain");
-                    StartActivity(Intent.CreateChooser(sendIntent, "Share Log via"));
-                };
-            }
-
-            // Clear Log Window
-            if (btnClearLog != null)
-            {
-                btnClearLog.Click += (s, e) =>
+                    await TransmitDataAsync(bytesToSend, $"Direct ({text})");
+                }
+                else
                 {
-                    if (tvLog != null)
-                    {
-                        tvLog.Text = "Log cleared.\n";
-                        Toast.MakeText(this, "Log cleared", ToastLength.Short)?.Show();
-                    }
-                };
-            }
+                    Toast.MakeText(this, "Invalid hex string (e.g. 01 AA FF)", ToastLength.Short)?.Show();
+                }
+            };
 
-            if (btnSendCustom != null)
-            {
-                btnSendCustom.Click += async (s, e) =>
-                {
-                    string hex = etCustomHex?.Text?.Trim() ?? "";
-                    if (IsValidHex(hex))
-                        await SendByteOverTcpAsync(hex);
-                    else
-                        Toast.MakeText(this, "Enter valid hex byte (00 - FF)", ToastLength.Short)?.Show();
-                };
-            }
-
-            Button?[] buttons = { btnKey1, btnKey2, btnKey3, btnKey4 };
-            for (int i = 0; i < buttons.Length; i++)
+            for (int i = 0; i < 12; i++)
             {
                 int index = i;
-                Button? btn = buttons[i];
+                Button? btn = macroButtons[i];
                 if (btn != null)
                 {
-                    btn.Click += async (s, e) => await SendByteOverTcpAsync(keyValues[index]);
-                    btn.LongClick += (s, e) => ShowKeyConfigDialog(index);
+                    btn.Click += async (s, e) =>
+                    {
+                        bool isHex = macroFormats[index] == "HEX";
+                        byte[]? data = ParsePayload(macroPayloads[index], isHex, "None");
+                        if (data != null)
+                            await TransmitDataAsync(data, macroLabels[index]);
+                    };
+                    btn.LongClick += (s, e) => ShowMacroConfigDialog(index);
                 }
             }
-        }
 
-        private async Task ConnectToServerAsync()
-        {
-            string ip = etIp?.Text?.Trim() ?? "";
-            string portStr = etPort?.Text?.Trim() ?? "";
+            btnBench64K!.Click += async (s, e) => await ExecuteBenchmarkAsync(65536, "64 KB Test");
+            btnBench256K!.Click += async (s, e) => await ExecuteBenchmarkAsync(262144, "256 KB Test");
 
-            if (string.IsNullOrEmpty(ip) || !int.TryParse(portStr, out int port) || port < 1 || port > 65535)
+            btnSelectAndSendFile!.Click += (s, e) =>
             {
-                Toast.MakeText(this, "Invalid IP or Port", ToastLength.Short)?.Show();
-                return;
-            }
+                if (!isConnected) { Toast.MakeText(this, "Connect first!", ToastLength.Short)?.Show(); return; }
+                var intent = new Intent(Intent.ActionGetContent);
+                intent.SetType("*/*");
+                StartActivityForResult(Intent.CreateChooser(intent, "Select File to Send"), REQUEST_PICK_FILE);
+            };
 
-            var editor = prefs?.Edit();
-            editor?.PutString("SAVED_IP", ip);
-            editor?.PutString("SAVED_PORT", portStr);
-            editor?.Apply();
+            sbPacingDelay!.ProgressChanged += (s, e) =>
+            {
+                pacingDelayMs = e.Progress;
+                if (tvPacingVal != null)
+                    tvPacingVal.Text = $"Current Delay: {pacingDelayMs} ms {(pacingDelayMs == 0 ? "(Full line rate)" : "")}";
+            };
 
-            Log($"Connecting to {ip}:{port}...");
+            btnClearLog!.Click += (s, e) => { if (tvLog != null) tvLog.Text = "[SYS] Console cleared.\n"; };
+            btnCopyLog!.Click += (s, e) =>
+            {
+                var clipboard = (ClipboardManager?)GetSystemService(ClipboardService);
+                if (clipboard != null && tvLog != null)
+                {
+                    clipboard.PrimaryClip = ClipData.NewPlainText("NetByte Log", tvLog.Text);
+                    Toast.MakeText(this, "Log copied to clipboard", ToastLength.Short)?.Show();
+                }
+            };
+            btnShareLog!.Click += (s, e) =>
+            {
+                if (tvLog == null || string.IsNullOrWhiteSpace(tvLog.Text)) return;
+                var sendIntent = new Intent(Intent.ActionSend);
+                sendIntent.PutExtra(Intent.ExtraText, tvLog.Text);
+                sendIntent.SetType("text/plain");
+                StartActivity(Intent.CreateChooser(sendIntent, "Share NetByte Log"));
+            };
 
-            bool success = await Task.Run(() =>
+            void OpenGithub()
             {
                 try
                 {
-                    DisconnectInternal();
-                    tcpClient = new TcpClient();
-                    tcpClient.NoDelay = true;
+                    StartActivity(new Intent(Intent.ActionView, Android.Net.Uri.Parse(GITHUB_URL)));
+                }
+                catch (Exception ex)
+                {
+                    Toast.MakeText(this, ex.Message, ToastLength.Short)?.Show();
+                }
+            }
 
-                    var connectTask = tcpClient.ConnectAsync(ip, port);
-                    if (!connectTask.Wait(3000))
-                    {
-                        tcpClient.Close();
-                        return false;
-                    }
+            if (tvGithubLink != null) tvGithubLink.Click += (s, e) => OpenGithub();
+            if (btnOpenGithub != null) btnOpenGithub.Click += (s, e) => OpenGithub();
+        }
+
+        private void SelectTab(int index)
+        {
+            Button?[] tabBtns = { tabBtnTerminal, tabBtnMacros, tabBtnTransfer, tabBtnConfig, tabBtnAbout };
+            for (int i = 0; i < tabBtns.Length; i++)
+            {
+                if (tabBtns[i] != null)
+                {
+                    bool isSelected = (i == index);
+                    Color bgColor = isSelected ? Color.ParseColor("#007ACC") : Color.ParseColor("#E5E7EB");
+                    Color textColor = isSelected ? Color.White : Color.ParseColor("#4B5563");
+
+                    tabBtns[i]!.BackgroundTintList = ColorStateList.ValueOf(bgColor);
+                    tabBtns[i]!.SetTextColor(textColor);
+                }
+            }
+
+            if (tabViewTerminal != null) tabViewTerminal.Visibility = (index == 0) ? ViewStates.Visible : ViewStates.Gone;
+            if (tabViewMacros != null) tabViewMacros.Visibility = (index == 1) ? ViewStates.Visible : ViewStates.Gone;
+            if (tabViewTransfer != null) tabViewTransfer.Visibility = (index == 2) ? ViewStates.Visible : ViewStates.Gone;
+            if (tabViewConfig != null) tabViewConfig.Visibility = (index == 3) ? ViewStates.Visible : ViewStates.Gone;
+            if (tabViewAbout != null) tabViewAbout.Visibility = (index == 4) ? ViewStates.Visible : ViewStates.Gone;
+        }
+
+        private async Task StartConnectionAsync()
+        {
+            string ip = etTargetIp?.Text?.Trim() ?? "";
+            string portStr = etTargetPort?.Text?.Trim() ?? "";
+
+            if (!int.TryParse(portStr, out int port) || port < 1 || port > 65535)
+            {
+                Toast.MakeText(this, "Invalid Port number", ToastLength.Short)?.Show();
+                return;
+            }
+
+            prefs?.Edit()?.PutString("IP", ip)?.PutString("PORT", portStr)?.Apply();
+            Log($"[SYS] Connecting to {ip}:{port}...");
+
+            bool ok = await Task.Run(() =>
+            {
+                try
+                {
+                    CloseConnection();
+
+                    tcpClient = new TcpClient();
+                    tcpClient.NoDelay = true; // Disable Nagle algorithm for real-time response
+
+                    var task = tcpClient.ConnectAsync(ip, port);
+                    if (!task.Wait(3500)) throw new TimeoutException("Connection timed out");
 
                     netStream = tcpClient.GetStream();
+                    rxCts = new CancellationTokenSource();
+
+                    // Start background listener task
+                    _ = Task.Run(() => ListenIncomingDataAsync(rxCts.Token));
+
                     return true;
                 }
                 catch (Exception ex)
                 {
-                    RunOnUiThread(() => Log($"Connection failed: {ex.Message}"));
+                    RunOnUiThread(() => Log($"[ERR] Connect failed: {ex.Message}"));
                     return false;
                 }
             });
 
-            isConnected = success;
-            UpdateConnectButtonVisuals();
-            Log(success ? "-> CONNECTED." : "-> Could not connect.");
+            isConnected = ok;
+            UpdateUiConnectionState();
         }
 
-        private void DisconnectFromServer()
+        private void CloseConnection()
         {
-            DisconnectInternal();
-            isConnected = false;
-            UpdateConnectButtonVisuals();
-            Log("-> DISCONNECTED.");
-        }
-
-        private void DisconnectInternal()
-        {
-            lock (streamLock)
+            lock (networkLock)
             {
+                try { rxCts?.Cancel(); } catch { }
                 try { netStream?.Close(); } catch { }
                 try { tcpClient?.Close(); } catch { }
+                rxCts = null;
                 netStream = null;
                 tcpClient = null;
             }
+            isConnected = false;
+            UpdateUiConnectionState();
         }
 
-        private void UpdateConnectButtonVisuals()
+        // Dedicated listener that continuously captures any byte received from ESP
+        private async Task ListenIncomingDataAsync(CancellationToken token)
         {
-            RunOnUiThread(() =>
+            byte[] rxBuffer = new byte[1024];
+
+            try
             {
-                if (btnConnect != null)
+                while (!token.IsCancellationRequested && netStream != null && netStream.CanRead)
                 {
-                    if (isConnected)
-                    {
-                        btnConnect.Text = "Disconnect";
-                        btnConnect.SetBackgroundColor(Color.ParseColor("#FF8C00"));
-                    }
-                    else
-                    {
-                        btnConnect.Text = "Connect";
-                        btnConnect.SetBackgroundColor(Color.ParseColor("#28A745"));
-                    }
-                }
-            });
-        }
+                    int bytesRead = await netStream.ReadAsync(rxBuffer, 0, rxBuffer.Length, token);
+                    if (bytesRead <= 0) break; // Server closed connection
 
-        private async Task SendByteOverTcpAsync(string hex)
-        {
-            if (!isConnected || netStream == null)
-            {
-                Toast.MakeText(this, "Not connected!", ToastLength.Short)?.Show();
-                return;
+                    byte[] packet = new byte[bytesRead];
+                    Array.Copy(rxBuffer, packet, bytesRead);
+
+                    RunOnUiThread(() =>
+                    {
+                        int mode = spnViewFormat?.SelectedItemPosition ?? 0;
+                        string hex = BitConverter.ToString(packet).Replace("-", " ");
+                        string ascii = Encoding.ASCII.GetString(packet);
+
+                        if (mode == 1) // HEX Only
+                            Log($"[RX] {hex}");
+                        else if (mode == 2) // ASCII Only
+                            Log($"[RX] {ascii}");
+                        else // Mixed
+                            Log($"[RX] {hex} | \"{ascii.Replace("\r", "\\r").Replace("\n", "\\n")}\"");
+                    });
+                }
             }
-
-            byte byteToSend = Convert.ToByte(hex, 16);
-
-            await Task.Run(() =>
+            catch (Exception)
             {
-                try
-                {
-                    lock (streamLock)
-                    {
-                        if (netStream != null && netStream.CanWrite)
-                        {
-                            netStream.Write(new byte[] { byteToSend }, 0, 1);
-                            netStream.Flush();
-                        }
-                    }
-                    RunOnUiThread(() => Log($"-> Sent 0x{byteToSend:X2}"));
-                }
-                catch (Exception ex)
+                // Expected on cancellation or close
+            }
+            finally
+            {
+                if (isConnected)
                 {
                     RunOnUiThread(() =>
                     {
-                        Log($"Send error: {ex.Message}");
-                        DisconnectFromServer();
+                        Log("[SYS] Server closed connection.");
+                        CloseConnection();
                     });
+                }
+            }
+        }
+
+        private void UpdateUiConnectionState()
+        {
+            RunOnUiThread(() =>
+            {
+                if (vStatusDot != null && tvTopStatus != null)
+                {
+                    vStatusDot.SetBackgroundColor(Color.ParseColor(isConnected ? "#10B981" : "#F97316"));
+                    tvTopStatus.Text = isConnected ? "Connected" : "Disconnected";
+                    tvTopStatus.SetTextColor(Color.ParseColor(isConnected ? "#10B981" : "#F97316"));
+                }
+
+                if (btnMainConnect != null)
+                {
+                    btnMainConnect.Text = isConnected ? "Disconnect" : "Connect";
+                    btnMainConnect.BackgroundTintList = ColorStateList.ValueOf(
+                        isConnected ? Color.ParseColor("#DC2626") : Color.ParseColor("#059669")
+                    );
                 }
             });
         }
 
-        private void SetSpeedButtonsEnabled(bool enabled)
+        private async Task TransmitDataAsync(byte[] data, string desc)
         {
-            RunOnUiThread(() =>
+            if (!isConnected || netStream == null)
             {
-                if (btnSpeedTestESP != null) btnSpeedTestESP.Enabled = enabled;
-                if (btnSpeedTestSTM != null) btnSpeedTestSTM.Enabled = enabled;
+                Toast.MakeText(this, "Connect first!", ToastLength.Short)?.Show();
+                return;
+            }
+
+            try
+            {
+                lock (networkLock)
+                {
+                    if (netStream != null && netStream.CanWrite)
+                    {
+                        netStream.Write(data, 0, data.Length);
+                        netStream.Flush();
+                    }
+                }
+                Log($"[TX] {BitConverter.ToString(data).Replace("-", " ")} ({desc})");
+            }
+            catch (Exception ex)
+            {
+                Log($"[ERR] TX Failed: {ex.Message}");
+            }
+        }
+
+        private async Task ExecuteBenchmarkAsync(int totalBytes, string testName)
+        {
+            if (!isConnected || netStream == null) { Toast.MakeText(this, "Connect first!", ToastLength.Short)?.Show(); return; }
+
+            Log($"--- Starting {testName} ({totalBytes / 1024} KB) ---");
+
+            await Task.Run(async () =>
+            {
+                try
+                {
+                    byte[] payload = new byte[totalBytes];
+                    payload[0] = 0xFE;
+                    for (int i = 1; i < totalBytes; i++) payload[i] = 0xAA;
+
+                    Stopwatch sw = Stopwatch.StartNew();
+                    int offset = 0;
+                    const int chunk = 1024;
+
+                    while (offset < totalBytes && isConnected)
+                    {
+                        int size = Math.Min(chunk, totalBytes - offset);
+                        lock (networkLock)
+                        {
+                            netStream?.Write(payload, offset, size);
+                        }
+                        offset += size;
+
+                        if (offset % 4096 == 0)
+                            await Task.Delay(2);
+                    }
+
+                    lock (networkLock) { netStream?.Flush(); }
+                    sw.Stop();
+
+                    double elapsedSec = Math.Max(0.001, sw.Elapsed.TotalSeconds);
+                    double bytesPerSec = totalBytes / elapsedSec;
+
+                    if (bytesPerSec > maxPeakBytesPerSec)
+                    {
+                        maxPeakBytesPerSec = bytesPerSec;
+                        prefs?.Edit()?.PutString("MAX_PEAK_SPEED", maxPeakBytesPerSec.ToString())?.Apply();
+                    }
+
+                    RunOnUiThread(() =>
+                    {
+                        Log($"Transferred {totalBytes / 1024} KB in {sw.ElapsedMilliseconds} ms -> Speed: {FormatSpeed(bytesPerSec)}");
+                        if (tvBenchStats != null) tvBenchStats.Text = $"Peak Speed: {FormatSpeed(maxPeakBytesPerSec)}";
+                    });
+                }
+                catch (Exception ex)
+                {
+                    RunOnUiThread(() => Log($"Benchmark Error: {ex.Message}"));
+                }
             });
+        }
+
+        protected override async void OnActivityResult(int requestCode, Result resultCode, Intent? data)
+        {
+            base.OnActivityResult(requestCode, resultCode, data);
+            if (requestCode == REQUEST_PICK_FILE && resultCode == Result.Ok && data?.Data != null)
+            {
+                await StreamFileAsync(data.Data);
+            }
+        }
+
+        private async Task StreamFileAsync(Android.Net.Uri fileUri)
+        {
+            Log($"--- Initiating File Transfer ---");
+
+            await Task.Run(async () =>
+            {
+                try
+                {
+                    using (Stream? inStream = ContentResolver?.OpenInputStream(fileUri))
+                    {
+                        if (inStream == null) throw new Exception("Cannot read file stream");
+
+                        byte[] buffer = new byte[512];
+                        int bytesRead;
+                        long totalStreamed = 0;
+                        Stopwatch sw = Stopwatch.StartNew();
+                        int activeDelay = Math.Max(2, pacingDelayMs);
+
+                        while ((bytesRead = await inStream.ReadAsync(buffer, 0, buffer.Length)) > 0 && isConnected)
+                        {
+                            lock (networkLock)
+                            {
+                                netStream?.Write(buffer, 0, bytesRead);
+                                netStream?.Flush();
+                            }
+                            totalStreamed += bytesRead;
+                            await Task.Delay(activeDelay);
+                        }
+
+                        sw.Stop();
+                        RunOnUiThread(() =>
+                        {
+                            Log($"File sent: {totalStreamed} bytes in {sw.ElapsedMilliseconds} ms");
+                            if (tvFileTransferStatus != null)
+                                tvFileTransferStatus.Text = $"Sent {totalStreamed} bytes ({FormatSpeed(totalStreamed / Math.Max(0.001, sw.Elapsed.TotalSeconds))})";
+                        });
+                    }
+                }
+                catch (Exception ex)
+                {
+                    RunOnUiThread(() => Log($"Transfer Error: {ex.Message}"));
+                }
+            });
+        }
+
+        private void ShowMacroConfigDialog(int keyIndex)
+        {
+            LinearLayout layout = new LinearLayout(this) { Orientation = Android.Widget.Orientation.Vertical };
+            layout.SetPadding(40, 20, 40, 10);
+
+            EditText txtName = new EditText(this) { Hint = "Button Label", Text = macroLabels[keyIndex] };
+            layout.AddView(txtName);
+
+            EditText txtData = new EditText(this) { Hint = "Command (HEX or ASCII)", Text = macroPayloads[keyIndex] };
+            layout.AddView(txtData);
+
+            CheckBox chkHex = new CheckBox(this) { Text = "Treat as HEX", Checked = (macroFormats[keyIndex] == "HEX") };
+            layout.AddView(chkHex);
+
+            new AlertDialog.Builder(this)
+                .SetTitle($"Edit Key {keyIndex + 1}")
+                .SetView(layout)
+                .SetPositiveButton("Save", (s, e) =>
+                {
+                    macroLabels[keyIndex] = txtName.Text?.Trim() ?? $"KEY {keyIndex + 1}";
+                    macroPayloads[keyIndex] = txtData.Text?.Trim() ?? "00";
+                    macroFormats[keyIndex] = chkHex.Checked ? "HEX" : "ASCII";
+
+                    prefs?.Edit()?
+                        .PutString($"M_LBL_{keyIndex}", macroLabels[keyIndex])?
+                        .PutString($"M_PAY_{keyIndex}", macroPayloads[keyIndex])?
+                        .PutString($"M_FMT_{keyIndex}", macroFormats[keyIndex])?
+                        .Apply();
+
+                    UpdateMacroButtonLabels();
+                })
+                .SetNegativeButton("Cancel", (s, e) => { })
+                .Show();
+        }
+
+        private byte[]? ParsePayload(string input, bool isHex, string endingMode)
+        {
+            if (isHex)
+            {
+                string cleanHex = Regex.Replace(input, @"[^0-9A-Fa-f]", "");
+                if (cleanHex.Length % 2 != 0) cleanHex = "0" + cleanHex;
+                byte[] raw = new byte[cleanHex.Length / 2];
+                for (int i = 0; i < raw.Length; i++)
+                    raw[i] = Convert.ToByte(cleanHex.Substring(i * 2, 2), 16);
+                return raw;
+            }
+
+            string append = endingMode switch
+            {
+                "CR+LF (\\r\\n)" => "\r\n",
+                "LF (\\n)" => "\n",
+                "CR (\\r)" => "\r",
+                _ => ""
+            };
+
+            return Encoding.ASCII.GetBytes(input + append);
         }
 
         private string FormatSpeed(double bytesPerSec)
         {
             double kbps = bytesPerSec / 1024.0;
             double mbps = kbps / 1024.0;
-            double bitRateMbps = (bytesPerSec * 8.0) / (1000.0 * 1000.0);
+            double bitRateMbps = (bytesPerSec * 8.0) / 1000000.0;
 
             if (mbps >= 1.0)
                 return $"{mbps:F2} MB/s ({bitRateMbps:F2} Mbps)";
-            else
-                return $"{kbps:F2} KB/s ({bitRateMbps:F2} Mbps)";
+            return $"{kbps:F2} KB/s ({bitRateMbps:F2} Mbps)";
         }
-
-        private async Task ExecuteSpeedBenchmarkAsync(byte headerByte, int totalBytes, string targetName, bool isESP)
-        {
-            isTestingSpeed = true;
-            SetSpeedButtonsEnabled(false);
-            Log($"--- Starting Bulk Test: {targetName} ({totalBytes / 1024} KB) ---");
-
-            await Task.Run(async () =>
-            {
-                try
-                {
-                    if (netStream == null || !netStream.CanWrite) throw new Exception("Stream unavailable.");
-
-                    while (netStream.DataAvailable)
-                    {
-                        netStream.ReadByte();
-                    }
-
-                    byte[] payload = new byte[totalBytes];
-                    payload[0] = headerByte;
-                    for (int i = 1; i < totalBytes; i++) payload[i] = 0xAA;
-
-                    byte[] ack = new byte[1];
-                    Stopwatch sw = Stopwatch.StartNew();
-
-                    int offset = 0;
-                    const int chunkSize = 4096;
-                    while (offset < totalBytes)
-                    {
-                        int sendSize = Math.Min(chunkSize, totalBytes - offset);
-                        await netStream.WriteAsync(payload, offset, sendSize);
-                        offset += sendSize;
-                    }
-                    await netStream.FlushAsync();
-
-                    var readTask = netStream.ReadAsync(ack, 0, 1);
-                    var timeoutTask = Task.Delay(10000);
-
-                    if (await Task.WhenAny(readTask, timeoutTask) == timeoutTask)
-                    {
-                        throw new Exception("Timeout waiting for completion ACK.");
-                    }
-
-                    int bytesRead = await readTask;
-                    sw.Stop();
-
-                    if (bytesRead <= 0 || ack[0] != 0x06)
-                    {
-                        throw new Exception("Invalid response from target.");
-                    }
-
-                    double elapsedSec = sw.Elapsed.TotalSeconds;
-                    if (elapsedSec <= 0.0001) elapsedSec = 0.001;
-
-                    double bytesPerSec = totalBytes / elapsedSec;
-
-                    // Update and persist peak speed
-                    bool isNewRecord = false;
-                    if (isESP)
-                    {
-                        if (bytesPerSec > maxSpeedBytesPerSecESP)
-                        {
-                            maxSpeedBytesPerSecESP = bytesPerSec;
-                            isNewRecord = true;
-                            prefs?.Edit()?.PutString("MAX_SPEED_ESP", maxSpeedBytesPerSecESP.ToString())?.Apply();
-                        }
-                    }
-                    else
-                    {
-                        if (bytesPerSec > maxSpeedBytesPerSecSTM)
-                        {
-                            maxSpeedBytesPerSecSTM = bytesPerSec;
-                            isNewRecord = true;
-                            prefs?.Edit()?.PutString("MAX_SPEED_STM", maxSpeedBytesPerSecSTM.ToString())?.Apply();
-                        }
-                    }
-
-                    double currentMax = isESP ? maxSpeedBytesPerSecESP : maxSpeedBytesPerSecSTM;
-                    string currentSpeedStr = FormatSpeed(bytesPerSec);
-                    string maxSpeedStr = FormatSpeed(currentMax);
-
-                    RunOnUiThread(() =>
-                    {
-                        Log($"Streamed {totalBytes / 1024} KB in {sw.ElapsedMilliseconds} ms");
-                        Log($"-> Current Speed: {currentSpeedStr}");
-                        Log($"-> Peak Record:   {maxSpeedStr}" + (isNewRecord ? " [NEW MAX!]" : ""));
-                    });
-                }
-                catch (Exception ex)
-                {
-                    RunOnUiThread(() => Log($"Test Error: {ex.Message}"));
-                }
-                finally
-                {
-                    isTestingSpeed = false;
-                    SetSpeedButtonsEnabled(true);
-                }
-            });
-        }
-
-        private void ShowKeyConfigDialog(int keyIndex)
-        {
-            LinearLayout layout = new LinearLayout(this)
-            {
-                Orientation = WidgetOrientation.Vertical
-            };
-            layout.SetPadding(40, 20, 40, 10);
-
-            EditText txtName = new EditText(this)
-            {
-                Hint = "Button Name (e.g. KEY1, ON)",
-                Text = keyNames[keyIndex]
-            };
-            layout.AddView(txtName);
-
-            EditText txtHex = new EditText(this)
-            {
-                Hint = "Hex Command (00 - FF)",
-                Text = keyValues[keyIndex]
-            };
-            txtHex.SetFilters(new Android.Text.IInputFilter[] { new Android.Text.InputFilterLengthFilter(2) });
-            layout.AddView(txtHex);
-
-            new AlertDialog.Builder(this)
-                .SetTitle($"Configure Key {keyIndex + 1}")
-                .SetView(layout)
-                .SetPositiveButton("Save", (s, e) =>
-                {
-                    string newName = txtName.Text?.Trim() ?? $"KEY{keyIndex + 1}";
-                    string newHex = txtHex.Text?.Trim().ToUpper() ?? "";
-
-                    if (IsValidHex(newHex))
-                    {
-                        keyNames[keyIndex] = string.IsNullOrEmpty(newName) ? $"KEY{keyIndex + 1}" : newName;
-                        keyValues[keyIndex] = newHex;
-
-                        var editor = prefs?.Edit();
-                        if (editor != null)
-                        {
-                            editor.PutString($"NAME_{keyIndex}", keyNames[keyIndex]);
-                            editor.PutString($"VAL_{keyIndex}", keyValues[keyIndex]);
-                            editor.Apply();
-                        }
-
-                        UpdateButtonLabels();
-                        Log($"Saved: '{keyNames[keyIndex]}' -> 0x{newHex}");
-                    }
-                    else
-                    {
-                        Toast.MakeText(this, "Invalid hex byte!", ToastLength.Short)?.Show();
-                    }
-                })
-                .SetNegativeButton("Cancel", (s, e) => { })
-                .Show();
-        }
-
-        private bool IsValidHex(string val) => Regex.IsMatch(val, "^[0-9A-Fa-f]{1,2}$");
 
         private void Log(string msg)
         {
@@ -519,19 +661,52 @@ namespace FeyzTCP_Tester
                 if (tvLog != null)
                 {
                     tvLog.Text += $"\n{msg}";
-                    if (scrollLog != null)
-                    {
-                        scrollLog.Post(() => scrollLog.FullScroll(Android.Views.FocusSearchDirection.Down));
-                    }
+                    scrollLog?.Post(() => scrollLog.FullScroll(FocusSearchDirection.Down));
                 }
             });
         }
 
         protected override void OnDestroy()
         {
-            DisconnectInternal();
+            CloseConnection();
             base.OnDestroy();
+        }
+
+        private class ThemedSpinnerAdapter : BaseAdapter<string>
+        {
+            private readonly Context context;
+            private readonly string[] items;
+
+            public ThemedSpinnerAdapter(Context context, string[] items)
+            {
+                this.context = context;
+                this.items = items;
+            }
+
+            public override int Count => items.Length;
+            public override string this[int position] => items[position];
+            public override long GetItemId(int position) => position;
+
+            public override View GetView(int position, View? convertView, ViewGroup? parent)
+            {
+                TextView tv = (TextView?)(convertView) ?? new TextView(context);
+                tv.Text = items[position];
+                tv.SetTextColor(Color.ParseColor("#1F2937"));
+                tv.SetTextSize(Android.Util.ComplexUnitType.Sp, 13);
+                tv.SetPadding(16, 12, 16, 12);
+                return tv;
+            }
+
+            public override View GetDropDownView(int position, View? convertView, ViewGroup? parent)
+            {
+                TextView tv = (TextView?)(convertView) ?? new TextView(context);
+                tv.Text = items[position];
+                tv.SetTextColor(Color.ParseColor("#111827"));
+                tv.SetBackgroundColor(Color.ParseColor("#FFFFFF"));
+                tv.SetTextSize(Android.Util.ComplexUnitType.Sp, 14);
+                tv.SetPadding(24, 20, 24, 20);
+                return tv;
+            }
         }
     }
 }
-
